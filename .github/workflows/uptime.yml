@@ -1,0 +1,37 @@
+# BasisLens uptime check (Oct 2026). Runs on GitHub's servers every 10 minutes, outside the BasisLens server, so it still
+# alerts when that server is down. A failed run makes GitHub email the repository owner (default notification setting).
+name: Uptime
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: uptime
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check the website, the API and the sign-in page
+        run: |
+          set -u
+          fail=0
+          check() {  # name url; two tries 45 s apart so one slow answer is not an alert
+            for try in 1 2; do
+              code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 -L "$2" || echo 000)
+              if [ "$code" -ge 200 ] && [ "$code" -lt 400 ]; then echo "OK   $1 ($code)"; return 0; fi
+              echo "try $try: $1 answered $code"; [ $try = 1 ] && sleep 45
+            done
+            echo "DOWN $1 ($2)"; echo "::error title=BasisLens down::$1 did not answer ($2)"; return 1
+          }
+          check "Website" "https://basislens.com/" || fail=1
+          check "API health" "https://basislens.com/api/health" || fail=1
+          check "Sign-in page" "https://basislens.com/app/sign-in" || fail=1
+          exit $fail

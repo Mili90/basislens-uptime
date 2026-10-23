@@ -1,0 +1,25 @@
+# GitHub pauses scheduled workflows in a public repository after 60 days without activity. This monthly commit keeps
+# the uptime check running.
+name: Keep alive
+
+on:
+  schedule:
+    - cron: "17 6 1 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  keepalive:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Record a heartbeat
+        run: |
+          date -u +%FT%TZ > HEARTBEAT
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add HEARTBEAT
+          git commit -m "Keep the uptime check active" && git push
